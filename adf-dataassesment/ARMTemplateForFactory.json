@@ -1,0 +1,1162 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-dataassesment"
+		},
+		"LS_BLOB_inputcontainer_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'LS_BLOB_inputcontainer'"
+		},
+		"LS_SQL_Assesment_password": {
+			"type": "secureString",
+			"metadata": "Secure string for 'password' of 'LS_SQL_Assesment'"
+		},
+		"LS_SQL_Assesment_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "sqlserver-company.database.windows.net"
+		},
+		"LS_SQL_Assesment_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "sqldb-1stquestion"
+		},
+		"LS_SQL_Assesment_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "lalith"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_blobToSql')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy data1",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BLOB_input2",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_SQL_2",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "INGESTION"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_BLOB_input2')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_2')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_clean')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Pipeline to Clean and handling null values in dataset",
+				"activities": [
+					{
+						"name": "Cleaning the Nulls in Tables",
+						"description": "Converting Null values to the \"unknown\" ",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_CLEAN",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"ordersTable": {},
+									"customersTable": {},
+									"SinktoPrepCustomers": {},
+									"SinktoPrepOrders": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "INGESTION"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/DF_CLEAN')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_mergeFiles')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Merge Orders Dataset",
+						"description": "copy all the dataset with order details to single consolidated order file",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "ExcelSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"wildcardFileName": "*.xlsx",
+									"enablePartitionDiscovery": false
+								}
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings",
+									"copyBehavior": "MergeFiles"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BLOB_inputorders",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_BLOB_consolidateorders",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Merge Customers Dataset",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"wildcardFileName": "*.csv",
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings",
+									"copyBehavior": "MergeFiles"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".csv"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BLOB_inputcustomers",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_BLOB_consolidatecustomers",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "INGESTION"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_BLOB_inputorders')]",
+				"[concat(variables('factoryId'), '/datasets/DS_BLOB_consolidateorders')]",
+				"[concat(variables('factoryId'), '/datasets/DS_BLOB_inputcustomers')]",
+				"[concat(variables('factoryId'), '/datasets/DS_BLOB_consolidatecustomers')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_outputBlobToSql')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Pipeline of ingesting the merged files into the staging area of sql server\n",
+				"activities": [
+					{
+						"name": "customerOutput blob to DB",
+						"description": "Creating Table customers in DB",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BLOB_consolidatecustomers",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_SQL_customerstable",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "orderOutput blob to DB",
+						"description": "Creating Table orders in DB",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BLOB_consolidateorders",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_SQL_orderstable",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "INGESTION"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_BLOB_consolidatecustomers')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_customerstable')]",
+				"[concat(variables('factoryId'), '/datasets/DS_BLOB_consolidateorders')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_orderstable')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_reporting')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Pipeline to find fact table by connecting the orders and customers ",
+				"activities": [
+					{
+						"name": "reportingDataFlow",
+						"description": "converting to reporting",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_FACT",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"PrepCustomers": {},
+									"prepOrders": {},
+									"toReportingSQL": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "INGESTION"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/DF_FACT')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_BLOB_consolidatecustomers')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_BLOB_inputcontainer",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": "consolidatecustomers.csv",
+						"container": "cr-consolidatedfolder"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_BLOB_inputcontainer')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_BLOB_consolidateorders')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_BLOB_inputcontainer",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": "consolidatedorders.xlsx",
+						"container": "cr-consolidatedfolder"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_BLOB_inputcontainer')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_BLOB_input2')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_BLOB_inputcontainer",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": "240826 Superstore.csv",
+						"container": "cr-input2"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": [
+					{
+						"name": "Row ID",
+						"type": "String"
+					},
+					{
+						"name": "Order ID",
+						"type": "String"
+					},
+					{
+						"name": "Order Date",
+						"type": "String"
+					},
+					{
+						"name": "Ship Date",
+						"type": "String"
+					},
+					{
+						"name": "Ship Mode",
+						"type": "String"
+					},
+					{
+						"name": "Customer ID",
+						"type": "String"
+					},
+					{
+						"name": "Customer Name",
+						"type": "String"
+					},
+					{
+						"name": "Segment",
+						"type": "String"
+					},
+					{
+						"name": "Country",
+						"type": "String"
+					},
+					{
+						"name": "City",
+						"type": "String"
+					},
+					{
+						"name": "State",
+						"type": "String"
+					},
+					{
+						"name": "Postal Code",
+						"type": "String"
+					},
+					{
+						"name": "Region",
+						"type": "String"
+					},
+					{
+						"name": "Product ID",
+						"type": "String"
+					},
+					{
+						"name": "Category",
+						"type": "String"
+					},
+					{
+						"name": "Sub-Category",
+						"type": "String"
+					},
+					{
+						"name": "Product Name",
+						"type": "String"
+					},
+					{
+						"name": "Sales",
+						"type": "String"
+					},
+					{
+						"name": "Quantity",
+						"type": "String"
+					},
+					{
+						"name": "Discount",
+						"type": "String"
+					},
+					{
+						"name": "Profit",
+						"type": "String"
+					}
+				]
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_BLOB_inputcontainer')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_BLOB_inputcustomers')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_BLOB_inputcontainer",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"container": "cr-inputcontainer"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": false,
+					"quoteChar": "\""
+				},
+				"schema": [
+					{
+						"type": "String"
+					},
+					{
+						"type": "String"
+					},
+					{
+						"type": "String"
+					},
+					{
+						"type": "String"
+					},
+					{
+						"type": "String"
+					},
+					{
+						"type": "String"
+					},
+					{
+						"type": "String"
+					},
+					{
+						"type": "String"
+					},
+					{
+						"type": "String"
+					},
+					{
+						"type": "String"
+					}
+				]
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_BLOB_inputcontainer')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_BLOB_inputorders')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_BLOB_inputcontainer",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Excel",
+				"typeProperties": {
+					"sheetName": "sheet1",
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"container": "cr-inputcontainer"
+					}
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_BLOB_inputcontainer')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_SQL_2')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_SQL_Assesment",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": "staging",
+					"table": "stores"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_SQL_Assesment')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_SQL_customerstable')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_SQL_Assesment",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": "staging",
+					"table": "customers"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_SQL_Assesment')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_SQL_orderstable')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_SQL_Assesment",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": "staging",
+					"table": "orders"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_SQL_Assesment')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_SQL_prepcustomers')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_SQL_Assesment",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": "prep",
+					"table": "customers1"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_SQL_Assesment')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_SQL_preporders')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_SQL_Assesment",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": "prep",
+					"table": "orders1"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_SQL_Assesment')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_SQL_reportingData')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_SQL_Assesment",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": "reporting",
+					"table": "finalData"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_SQL_Assesment')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_BLOB_inputcontainer')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Linked Service to connect ADF to Blob Storage",
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('LS_BLOB_inputcontainer_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/LS_SQL_Assesment')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Linked Service to connect adf and SQL Db",
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"server": "[parameters('LS_SQL_Assesment_properties_typeProperties_server')]",
+					"database": "[parameters('LS_SQL_Assesment_properties_typeProperties_database')]",
+					"encrypt": "mandatory",
+					"trustServerCertificate": false,
+					"authenticationType": "SQL",
+					"userName": "[parameters('LS_SQL_Assesment_properties_typeProperties_userName')]",
+					"password": {
+						"type": "SecureString",
+						"value": "[parameters('LS_SQL_Assesment_password')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DF_CLEAN')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Dataflow to clean the customers and orders table",
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DS_SQL_orderstable",
+								"type": "DatasetReference"
+							},
+							"name": "ordersTable"
+						},
+						{
+							"dataset": {
+								"referenceName": "DS_SQL_customerstable",
+								"type": "DatasetReference"
+							},
+							"name": "customersTable"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "DS_SQL_prepcustomers",
+								"type": "DatasetReference"
+							},
+							"name": "SinktoPrepCustomers"
+						},
+						{
+							"dataset": {
+								"referenceName": "DS_SQL_preporders",
+								"type": "DatasetReference"
+							},
+							"name": "SinktoPrepOrders"
+						}
+					],
+					"transformations": [
+						{
+							"name": "handlingNullCustomers",
+							"description": "updating the columns 'CustomerID, FirstName, LastName, Email, PhoneNumber, Address, City, State, ZipCode, Country' from Null to Unknown"
+						},
+						{
+							"name": "handlingOrderData"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          OrderID as string,",
+						"          ProductID as string,",
+						"          ProductName as string,",
+						"          Quantity as integer,",
+						"          OrderTimestamp as date,",
+						"          Price as integer,",
+						"          CustomerID as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> ordersTable",
+						"source(output(",
+						"          CustomerID as string,",
+						"          FirstName as string,",
+						"          LastName as string,",
+						"          Email as string,",
+						"          PhoneNumber as string,",
+						"          Address as string,",
+						"          City as string,",
+						"          State as string,",
+						"          ZipCode as integer,",
+						"          Country as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> customersTable",
+						"customersTable derive(ZipCode = iifNull(ZipCode,0),",
+						"          Email = iif(Email==\"NULL\", replace(Email, \"NULL\", \"Unknown\"), iifNull(Email, \"Unknown\")),",
+						"          LastName = iif(LastName==\"NULL\",replace(LastName, \"NULL\", \"Unknown\"), iifNull(LastName, \"Unknown\")),",
+						"          PhoneNumber = iif(PhoneNumber==\"NULL\",replace(PhoneNumber, \"NULL\", \"Unknown\"), iifNull(PhoneNumber, \"Unknown\")),",
+						"          City = iif(City==\"NULL\",replace(City, \"NULL\", \"Unknown\"), iifNull(City, \"Unknown\")),",
+						"          Country = iif(Country==\"NULL\",replace(Country, \"NULL\", \"Unknown\"), iifNull(Country,\"Unknown\")),",
+						"          State = iif(State==\"NULL\",replace(State, \"NULL\", \"Unknown\"), iifNull(State, \"Unknown\")),",
+						"          Address = iif(Address==\"NULL\",replace(Address, \"NULL\", \"Unknown\"), iifNull(Address, \"Unknown\"))) ~> handlingNullCustomers",
+						"ordersTable derive(Quantity = iifNull(Quantity,0),",
+						"          Price = iifNull(Price,0)) ~> handlingOrderData",
+						"handlingNullCustomers sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     recreate:true,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError') ~> SinktoPrepCustomers",
+						"handlingOrderData sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError') ~> SinktoPrepOrders"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_orderstable')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_customerstable')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_prepcustomers')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_preporders')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DF_FACT')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "fact table derivation from orders and customers",
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DS_SQL_prepcustomers",
+								"type": "DatasetReference"
+							},
+							"name": "PrepCustomers"
+						},
+						{
+							"dataset": {
+								"referenceName": "DS_SQL_preporders",
+								"type": "DatasetReference"
+							},
+							"name": "prepOrders"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "DS_SQL_reportingData",
+								"type": "DatasetReference"
+							},
+							"name": "toReportingSQL",
+							"description": "creating new table of reportingdata"
+						}
+					],
+					"transformations": [
+						{
+							"name": "TotalPrice",
+							"description": "Finding Total Price of order"
+						},
+						{
+							"name": "custjoinorder",
+							"description": "Join of Customers and Orders"
+						},
+						{
+							"name": "sort1"
+						},
+						{
+							"name": "window1"
+						},
+						{
+							"name": "filter2"
+						},
+						{
+							"name": "select1"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          CustomerID as string,",
+						"          FirstName as string,",
+						"          LastName as string,",
+						"          Email as string,",
+						"          PhoneNumber as string,",
+						"          Address as string,",
+						"          City as string,",
+						"          State as string,",
+						"          ZipCode as integer,",
+						"          Country as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> PrepCustomers",
+						"source(output(",
+						"          OrderID as string,",
+						"          ProductID as string,",
+						"          ProductName as string,",
+						"          Quantity as integer,",
+						"          OrderTimestamp as date,",
+						"          Price as integer,",
+						"          CustomerID as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> prepOrders",
+						"filter2 derive(Total = Quantity*Price) ~> TotalPrice",
+						"PrepCustomers, TotalPrice join(PrepCustomers@CustomerID == prepOrders@CustomerID,",
+						"     joinType:'right',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'auto')~> custjoinorder",
+						"prepOrders sort(asc(OrderID, true)) ~> sort1",
+						"sort1 window(over(OrderID),",
+						"     asc(OrderID, true),",
+						"     status = iif(OrderID==lag(OrderID,1),\"true\", \"false\")) ~> window1",
+						"window1 filter(status==\"true\") ~> filter2",
+						"custjoinorder select(mapColumn(",
+						"          CustomerID = prepOrders@CustomerID,",
+						"          FirstName,",
+						"          LastName,",
+						"          Email,",
+						"          Country,",
+						"          OrderID,",
+						"          ProductID,",
+						"          ProductName,",
+						"          Quantity,",
+						"          Price,",
+						"          Total",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> select1",
+						"select1 sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     recreate:true,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError') ~> toReportingSQL"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_prepcustomers')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_preporders')]",
+				"[concat(variables('factoryId'), '/datasets/DS_SQL_reportingData')]"
+			]
+		}
+	]
+}
