@@ -1,0 +1,16 @@
+{
+	"name": "DS_SQL_reportingData",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_SQL_Assesment",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": "reporting",
+			"table": "finalData"
+		}
+	}
+}

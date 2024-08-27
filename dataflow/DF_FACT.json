@@ -1,0 +1,125 @@
+{
+	"name": "DF_FACT",
+	"properties": {
+		"description": "fact table derivation from orders and customers",
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_SQL_prepcustomers",
+						"type": "DatasetReference"
+					},
+					"name": "PrepCustomers"
+				},
+				{
+					"dataset": {
+						"referenceName": "DS_SQL_preporders",
+						"type": "DatasetReference"
+					},
+					"name": "prepOrders"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_SQL_reportingData",
+						"type": "DatasetReference"
+					},
+					"name": "toReportingSQL",
+					"description": "creating new table of reportingdata"
+				}
+			],
+			"transformations": [
+				{
+					"name": "TotalPrice",
+					"description": "Finding Total Price of order"
+				},
+				{
+					"name": "custjoinorder",
+					"description": "Join of Customers and Orders"
+				},
+				{
+					"name": "sort1"
+				},
+				{
+					"name": "window1"
+				},
+				{
+					"name": "filter2"
+				},
+				{
+					"name": "select1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          CustomerID as string,",
+				"          FirstName as string,",
+				"          LastName as string,",
+				"          Email as string,",
+				"          PhoneNumber as string,",
+				"          Address as string,",
+				"          City as string,",
+				"          State as string,",
+				"          ZipCode as integer,",
+				"          Country as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> PrepCustomers",
+				"source(output(",
+				"          OrderID as string,",
+				"          ProductID as string,",
+				"          ProductName as string,",
+				"          Quantity as integer,",
+				"          OrderTimestamp as date,",
+				"          Price as integer,",
+				"          CustomerID as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> prepOrders",
+				"filter2 derive(Total = Quantity*Price) ~> TotalPrice",
+				"PrepCustomers, TotalPrice join(PrepCustomers@CustomerID == prepOrders@CustomerID,",
+				"     joinType:'right',",
+				"     matchType:'exact',",
+				"     ignoreSpaces: false,",
+				"     broadcast: 'auto')~> custjoinorder",
+				"prepOrders sort(asc(OrderID, true)) ~> sort1",
+				"sort1 window(over(OrderID),",
+				"     asc(OrderID, true),",
+				"     status = iif(OrderID==lag(OrderID,1),\"true\", \"false\")) ~> window1",
+				"window1 filter(status==\"true\") ~> filter2",
+				"custjoinorder select(mapColumn(",
+				"          CustomerID = prepOrders@CustomerID,",
+				"          FirstName,",
+				"          LastName,",
+				"          Email,",
+				"          Country,",
+				"          OrderID,",
+				"          ProductID,",
+				"          ProductName,",
+				"          Quantity,",
+				"          Price,",
+				"          Total",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> select1",
+				"select1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     recreate:true,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> toReportingSQL"
+			]
+		}
+	}
+}
