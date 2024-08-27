@@ -1,0 +1,19 @@
+{
+	"name": "DS_BLOB_inputorders",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_BLOB_inputcontainer",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Excel",
+		"typeProperties": {
+			"sheetName": "sheet1",
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"container": "cr-inputcontainer"
+			}
+		},
+		"schema": []
+	}
+}

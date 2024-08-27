@@ -1,0 +1,10 @@
+{
+	"name": "PL_outputBlobToSql",
+	"properties": {
+		"description": "Pipeline of ingesting the merged files into the sql server\n",
+		"folder": {
+			"name": "INGESTION"
+		},
+		"annotations": []
+	}
+}
