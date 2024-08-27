@@ -1,0 +1,25 @@
+{
+	"name": "DS_BLOB_OUTPUT_ORDERS",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_BLOB_TRAININGINPUT",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": "orders_merged.xlsx",
+				"folderPath": "output",
+				"container": "crjmantrainingdev001"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

@@ -1,0 +1,25 @@
+{
+	"name": "DS_BLOB_OUTPUT_CUSTOMERS",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_BLOB_TRAININGINPUT",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": "customers_merged.csv",
+				"folderPath": "output",
+				"container": "crjmantrainingdev001"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": false,
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

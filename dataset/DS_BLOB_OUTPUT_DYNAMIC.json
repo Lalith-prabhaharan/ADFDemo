@@ -1,0 +1,24 @@
+{
+	"name": "DS_BLOB_OUTPUT_DYNAMIC",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_BLOB_TRAININGINPUT",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"folderPath": "output",
+				"container": "crjmantrainingdev001"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

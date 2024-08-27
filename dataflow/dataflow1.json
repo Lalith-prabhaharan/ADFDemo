@@ -1,0 +1,61 @@
+{
+	"name": "dataflow1",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_BLOB_OUTPUT_ORDERS",
+						"type": "DatasetReference"
+					},
+					"name": "Orders",
+					"description": "Orders table"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_BLOB_OUTPUT_DYNAMIC",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "pricePerQuantity"
+				},
+				{
+					"name": "updatingPrice"
+				},
+				{
+					"name": "addingQuantity"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          OrderID as short,",
+				"          ProductID as string,",
+				"          ProductName as string,",
+				"          Quantity as short,",
+				"          OrderTimestamp as string,",
+				"          Price as double,",
+				"          CustomerID as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> Orders",
+				"Orders derive(priceperquantity = Price/Quantity) ~> pricePerQuantity",
+				"addingQuantity derive(newPrice = newQuantity*priceperquantity) ~> updatingPrice",
+				"pricePerQuantity derive(newQuantity = Quantity+2) ~> addingQuantity",
+				"updatingPrice sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     partitionFileNames:['dynamic.csv'],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     partitionBy('hash', 1)) ~> sink1"
+			]
+		}
+	}
+}
