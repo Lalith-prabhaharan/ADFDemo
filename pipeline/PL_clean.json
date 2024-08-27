@@ -1,0 +1,37 @@
+{
+	"name": "PL_clean",
+	"properties": {
+		"description": "Pipeline to Clean and handling null values in dataset",
+		"activities": [
+			{
+				"name": "Cleaning the Nulls in Tables",
+				"description": "Converting Null values to the \"unknown\" ",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "DF_CLEAN",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			}
+		],
+		"folder": {
+			"name": "INGESTION"
+		},
+		"annotations": []
+	}
+}

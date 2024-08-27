@@ -1,0 +1,112 @@
+{
+	"name": "DF_CLEAN",
+	"properties": {
+		"description": "Dataflow to clean the customers and orders table",
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_SQL_orderstable",
+						"type": "DatasetReference"
+					},
+					"name": "ordersTable"
+				},
+				{
+					"dataset": {
+						"referenceName": "DS_SQL_customerstable",
+						"type": "DatasetReference"
+					},
+					"name": "customersTable"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_SQL_prepcustomers",
+						"type": "DatasetReference"
+					},
+					"name": "SinktoPrepCustomers"
+				},
+				{
+					"dataset": {
+						"referenceName": "DS_SQL_preporders",
+						"type": "DatasetReference"
+					},
+					"name": "SinktoPrepOrders"
+				}
+			],
+			"transformations": [
+				{
+					"name": "handlingNullCustomers",
+					"description": "updating the columns 'CustomerID, FirstName, LastName, Email, PhoneNumber, Address, City, State, ZipCode, Country' from Null to Unknown"
+				},
+				{
+					"name": "handlingOrderData"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          OrderID as string,",
+				"          ProductID as string,",
+				"          ProductName as string,",
+				"          Quantity as integer,",
+				"          OrderTimestamp as date,",
+				"          Price as integer,",
+				"          CustomerID as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> ordersTable",
+				"source(output(",
+				"          CustomerID as string,",
+				"          FirstName as string,",
+				"          LastName as string,",
+				"          Email as string,",
+				"          PhoneNumber as string,",
+				"          Address as string,",
+				"          City as string,",
+				"          State as string,",
+				"          ZipCode as integer,",
+				"          Country as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> customersTable",
+				"customersTable derive(ZipCode = iifNull(ZipCode,0),",
+				"          Email = iif(Email==\"NULL\", replace(Email, \"NULL\", \"Unknown\"), iifNull(Email, \"Unknown\")),",
+				"          LastName = iif(LastName==\"NULL\",replace(LastName, \"NULL\", \"Unknown\"), iifNull(LastName, \"Unknown\")),",
+				"          PhoneNumber = iif(PhoneNumber==\"NULL\",replace(PhoneNumber, \"NULL\", \"Unknown\"), iifNull(PhoneNumber, \"Unknown\")),",
+				"          City = iif(City==\"NULL\",replace(City, \"NULL\", \"Unknown\"), iifNull(City, \"Unknown\")),",
+				"          Country = iif(Country==\"NULL\",replace(Country, \"NULL\", \"Unknown\"), iifNull(Country,\"Unknown\")),",
+				"          State = iif(State==\"NULL\",replace(State, \"NULL\", \"Unknown\"), iifNull(State, \"Unknown\")),",
+				"          Address = iif(Address==\"NULL\",replace(Address, \"NULL\", \"Unknown\"), iifNull(Address, \"Unknown\"))) ~> handlingNullCustomers",
+				"ordersTable derive(Quantity = iifNull(Quantity,0),",
+				"          Price = iifNull(Price,0)) ~> handlingOrderData",
+				"handlingNullCustomers sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     recreate:true,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> SinktoPrepCustomers",
+				"handlingOrderData sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> SinktoPrepOrders"
+			]
+		}
+	}
+}
